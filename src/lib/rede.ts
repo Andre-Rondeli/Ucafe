@@ -128,11 +128,7 @@ export const DIAS_DE_SOBREPOSICAO = 3
  * Ponha uma data ANTERIOR ao seu primeiro dia de venda na rede: data cedo demais só traz
  * vazio; data tarde demais deixa histórico para trás sem avisar.
  */
-// TEMPORÁRIO: carga inicial em fatias (ver docs/LIGAR-NO-PROCESSDESK.md — a primeira
-// sincronização sem watermark traz ~4 meses de uma vez e o Supabase corta em 1000 linhas
-// de estoque). Corra a primeira fatia com esta data, confira, depois volte para
-// '2026-05-01' e rode de novo para trazer o restante do histórico.
-export const PRIMEIRO_DIA = '2026-07-20'
+export const PRIMEIRO_DIA = '2026-05-01'
 
 /**
  * De que dia pedir o feed.
