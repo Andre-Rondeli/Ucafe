@@ -44,13 +44,18 @@ function respostaEnvio(extra: Record<string, unknown> = {}) {
 function chavesVapid(): { chaves: ChavesVapid | null; erro: string | null } {
   const publica = Deno.env.get('VAPID_PUBLIC_KEY')
   const privada = Deno.env.get('VAPID_PRIVATE_KEY')
-  const assunto = Deno.env.get('VAPID_SUBJECT') ?? 'mailto:carlos.eduardo@rondelli.com.br'
-  if (!publica || !privada) {
+  // O padrão VAPID exige um contato de quem manda o push — é para onde o serviço do
+  // navegador reclama se algo estiver errado. Sem valor plausível o envio é recusado, então
+  // ele é obrigatório aqui em vez de ter um padrão embutido: e-mail de outra pessoa no
+  // cabeçalho do seu push é problema calado.
+  const assunto = Deno.env.get('VAPID_SUBJECT')
+  if (!publica || !privada || !assunto) {
     return {
       chaves: null,
       erro:
-        'Chaves de push não configuradas. Faltam os secrets VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY ' +
-        '(gere com `node scripts/gerar-vapid.mjs`).',
+        'Chaves de push não configuradas. Faltam os secrets VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY ' +
+        'e VAPID_SUBJECT (gere as duas primeiras com `node scripts/gerar-vapid.mjs`; a terceira é ' +
+        'mailto:seu-email@suaempresa.com.br).',
     }
   }
   return { chaves: { publica, privada, assunto }, erro: null }

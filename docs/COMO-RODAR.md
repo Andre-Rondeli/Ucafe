@@ -94,6 +94,43 @@ seu projeto, e cadastre o segredo `SUPABASE_ACCESS_TOKEN` em Settings → Secret
 variables → Actions (crie o token em https://supabase.com/dashboard/account/tokens). É isso
 que publica as Edge Functions.
 
+### 5b. As Edge Functions — você não escreve nenhuma, só publica
+
+As quatro já vêm prontas e testadas em `supabase/functions/`:
+
+| Função | O que faz | Precisa de segredo? |
+|---|---|---|
+| `recompra` | o aviso das 9h — quem já devia ter repetido o pedido | não |
+| `avisos` | entrega o push no celular | **sim**, VAPID |
+| `gerenciar-usuario` | cria e edita gente em Mais → Equipe | não |
+| `processdesk` | busca venda e estoque nas lojas da rede | **sim**, o feed |
+
+**Publicar** é o CI que faz: todo push no `main` publica as quatro, depois de os testes
+passarem (por isso o passo do `PROJETO` e do `SUPABASE_ACCESS_TOKEN` acima). Para publicar
+na mão a primeira vez, com a CLI:
+
+```bash
+npx supabase functions deploy --project-ref SEU-REF
+```
+
+Sem nome de função = publica todas. Assim o repositório é a fonte da verdade e nenhuma fica
+para trás por esquecimento.
+
+**Os segredos** vão no dashboard → Edge Functions → Secrets (ou `npx supabase secrets set`).
+Eles vivem **só no servidor** — nunca no `.env`, nunca no bundle do site:
+
+| Segredo | De onde vem |
+|---|---|
+| `VAPID_PUBLIC_KEY` | `node scripts/gerar-vapid.mjs` |
+| `VAPID_PRIVATE_KEY` | idem — **nunca commite nem cole em chat** |
+| `VAPID_SUBJECT` | `mailto:morandi7@hotmail.com` |
+| `PROCESSDESK_FEED_URL` | `https://hjvlmhyputuvfmahtbdj.supabase.co/functions/v1/industria-espelho` |
+| `PROCESSDESK_FEED_KEY` | a chave que o Carlos entrega |
+
+Sem os três VAPID, o app funciona normalmente — só o aviso no celular não sai, e a função
+diz exatamente isso em vez de falhar calada. Trocar o par VAPID depois desinscreve todos os
+aparelhos: só troque se a chave privada vazar.
+
 ### 6. Ligar o espelho da rede
 
 Ver [LIGAR-NO-PROCESSDESK.md](LIGAR-NO-PROCESSDESK.md). Depende de uma chave que a Rede

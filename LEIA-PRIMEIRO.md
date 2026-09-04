@@ -46,7 +46,8 @@ Cada passo está detalhado em [docs/COMO-RODAR.md](docs/COMO-RODAR.md). Aqui é 
 2. **Aplique as 29 migrations** de `supabase/migrations/`, na ordem do nome do arquivo.
 3. **Configure o `.env`** (copie de `.env.example`) e rode `npm install && npm run dev`.
 4. **Crie o primeiro usuário admin** pelo dashboard do Supabase.
-5. **Publique** (Vercel lê o repositório e builda sozinha).
+5. **Publique** — Vercel builda o site sozinha; o CI publica as 4 Edge Functions. Você não
+   escreve nenhuma função: só cadastra os segredos delas.
 6. **Ligue o espelho da rede** — pede uma chave à Rede Rondelli. Ver
    [docs/LIGAR-NO-PROCESSDESK.md](docs/LIGAR-NO-PROCESSDESK.md).
 

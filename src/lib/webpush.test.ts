@@ -66,7 +66,7 @@ async function chavesVapid(): Promise<{ chaves: ChavesVapid; publicaCrypto: Cryp
     chaves: {
       publica: bytesParaBase64url(publica),
       privada: jwk.d as string,
-      assunto: 'mailto:torrao@rondelli.com.br',
+      assunto: 'mailto:avisos@exemplo.com.br',
     },
     publicaCrypto: par.publicKey,
   }
@@ -211,7 +211,7 @@ describe('VAPID (RFC 8292)', () => {
     const jwt = await tokenVapid(assinatura.endpoint, chaves, Date.UTC(2026, 7, 24, 12, 0, 0))
     const corpo = JSON.parse(decodificador.decode(base64urlParaBytes(jwt.split('.')[1])))
     expect(corpo.aud).toBe('https://fcm.googleapis.com')
-    expect(corpo.sub).toBe('mailto:torrao@rondelli.com.br')
+    expect(corpo.sub).toBe('mailto:avisos@exemplo.com.br')
     // 12 horas de validade
     expect(corpo.exp).toBe(Math.floor(Date.UTC(2026, 7, 24, 12, 0, 0) / 1000) + 12 * 3600)
   })

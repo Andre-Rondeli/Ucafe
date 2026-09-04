@@ -24,7 +24,7 @@ const jwk = await webcrypto.subtle.exportKey('jwk', par.privateKey)
 
 console.log('VAPID_PUBLIC_KEY=' + publica.toString('base64url'))
 console.log('VAPID_PRIVATE_KEY=' + jwk.d)
-console.log('VAPID_SUBJECT=mailto:carlos.eduardo@rondelli.com.br')
+console.log('VAPID_SUBJECT=mailto:morandi7@hotmail.com')
 console.log()
 console.log('Guarde com:')
 console.log('  npx supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=...')
