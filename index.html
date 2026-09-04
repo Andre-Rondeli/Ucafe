@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- `viewport-fit=cover` NÃO é enfeite: sem ele o WebKit devolve ZERO para todo
+         `env(safe-area-inset-*)`, e o padding que a barra de navegação usa para não ficar
+         embaixo do risquinho do iPhone (ver AppShell.tsx) não vale nada. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Ucafé — Vendas</title>
+    <meta name="description" content="Pedido com preço por faixa, consignado, recompra e comissão." />
+    <meta name="theme-color" content="#92400e" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icones/icone-192.png" />
+    <!-- iOS não lê o manifest: precisa do apple-touch-icon pra "Adicionar à Tela de Início" -->
+    <link rel="apple-touch-icon" href="/icones/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Ucafé" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

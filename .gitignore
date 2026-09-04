@@ -1,0 +1,15 @@
+.superpowers/
+node_modules
+dist
+dist-tsconfig
+.env
+.env.local
+*.tsbuildinfo
+.DS_Store
+supabase/.temp/
+
+# chaves do Web Push geradas localmente: nunca versionar
+.vapid.local
+
+# SQL montado para colar no painel do Supabase: não faz parte do código
+aplicar-supabase/
