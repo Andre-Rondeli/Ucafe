@@ -64,7 +64,17 @@ function Numeros({
   )
 }
 
-function LinhaDoProduto({ produto }: { produto: ResumoDeProduto }) {
+function LinhaDoProduto({
+  produto,
+  lojaCodigo,
+  linhas,
+}: {
+  produto: ResumoDeProduto
+  lojaCodigo: string
+  linhas: LinhaEspelho[]
+}) {
+  // Mesma série da loja, só que filtrada neste produto — a função já suporta isso.
+  const serie = serieDaLoja(linhas, lojaCodigo, produto.produtoCodigo)
   return (
     <li className="border-t border-stone-100 bg-stone-50 px-4 py-3">
       <p className="text-sm font-medium text-stone-800">
@@ -79,6 +89,12 @@ function LinhaDoProduto({ produto }: { produto: ResumoDeProduto }) {
           diaDoEstoque={produto.diaDoEstoque}
           coberturaDias={produto.coberturaDias}
         />
+      </div>
+      <div className="mt-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-stone-600">
+          Estoque × venda por dia — só deste produto
+        </p>
+        <GraficoEstoqueVenda serie={serie} />
       </div>
     </li>
   )
@@ -130,7 +146,12 @@ function BlocoDaLoja({ loja, linhas }: { loja: ResumoDeLoja; linhas: LinhaEspelh
         </div>
         <ul>
           {loja.produtos.map((p) => (
-            <LinhaDoProduto key={p.produtoCodigo} produto={p} />
+            <LinhaDoProduto
+              key={p.produtoCodigo}
+              produto={p}
+              lojaCodigo={loja.lojaCodigo}
+              linhas={linhas}
+            />
           ))}
         </ul>
       </details>
