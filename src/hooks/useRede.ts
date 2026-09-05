@@ -38,22 +38,25 @@ function diasAtras(dias: number): string {
 }
 
 /**
- * Lê `rede_dia` inteira dentro da janela, paginando.
+ * Lê `rede_dia` dentro do intervalo, paginando. `ate` opcional: sem ele, lê até o que
+ * houver (o caso de sempre, "desde X até hoje").
  *
  * Sem a paginação o PostgREST devolveria no máximo 1.000 linhas e PARARIA AÍ, sem erro e
  * sem aviso — a tela mostraria menos venda do que houve e ninguém saberia por quê. Hoje a
  * janela cabe folgada em uma página; o laço existe para o dia em que a indústria tiver
  * mais produtos.
  */
-async function lerEspelho(desde: string): Promise<LinhaEspelho[]> {
+async function lerEspelho(desde: string, ate?: string): Promise<LinhaEspelho[]> {
   const linhas: LinhaEspelho[] = []
   for (let inicio = 0; ; inicio += PAGINA) {
-    const { data, error } = await supabase
+    let consulta = supabase
       .from('rede_dia')
       .select(
         'dia, loja_codigo, loja_nome, loja_tipo, uf, produto_codigo, produto_nome, venda_qtd, venda_valor, estoque_qtd',
       )
       .gte('dia', desde)
+    if (ate) consulta = consulta.lte('dia', ate)
+    const { data, error } = await consulta
       .order('dia')
       .order('loja_codigo')
       .order('produto_codigo')
@@ -65,12 +68,15 @@ async function lerEspelho(desde: string): Promise<LinhaEspelho[]> {
   }
 }
 
-export function useRede() {
+/** Mês ou intervalo escolhido na tela, em vez da janela automática dos últimos 30 dias. */
+export type PeriodoDaRede = { inicio: string; fim: string }
+
+export function useRede(periodo?: PeriodoDaRede) {
   return useQuery({
-    queryKey: ['rede'],
+    queryKey: periodo ? ['rede', periodo.inicio, periodo.fim] : ['rede'],
     queryFn: async (): Promise<VisaoDaRede> => {
       const [linhas, sincronia] = await Promise.all([
-        lerEspelho(diasAtras(DIAS_CARREGADOS)),
+        periodo ? lerEspelho(periodo.inicio, periodo.fim) : lerEspelho(diasAtras(DIAS_CARREGADOS)),
         supabase
           .from('rede_sync_execucoes')
           .select('em, resultado, linhas_gravadas, detalhe')
@@ -79,7 +85,7 @@ export function useRede() {
           .maybeSingle(),
       ])
 
-      const lojas = resumirPorLoja(linhas)
+      const lojas = resumirPorLoja(linhas, periodo)
       const diaDoDado = lojas.reduce<string | null>((maior, l) => {
         if (!l.ultimoDiaComVenda) return maior
         return maior === null || l.ultimoDiaComVenda > maior ? l.ultimoDiaComVenda : maior

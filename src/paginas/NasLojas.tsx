@@ -1,6 +1,9 @@
+import { useState } from 'react'
 import { Carregando, Erro, Vazio } from '@/componentes/Estado'
 import { GraficoEstoqueVenda } from '@/componentes/GraficoEstoqueVenda'
-import { useRede, useSincronizarRede } from '@/hooks/useRede'
+import { useRede, useSincronizarRede, type PeriodoDaRede } from '@/hooks/useRede'
+import { limitesDoMes } from '@/lib/comissao'
+import { addDias, diffDias, hojeIso } from '@/lib/data'
 import { dataLonga, diasTexto, numeroTexto, reais } from '@/lib/formato'
 import {
   COBERTURA_CURTA,
@@ -12,6 +15,14 @@ import {
   type ResumoDeLoja,
   type ResumoDeProduto,
 } from '@/lib/rede'
+
+// hojeIso() dentro de cada atalho, nunca em const de módulo: como PWA o app fica aberto
+// por dias, e "este mês" congelado no carregamento apontaria pro mês errado depois da virada.
+const ATALHOS: { rotulo: string; periodo: () => PeriodoDaRede | null }[] = [
+  { rotulo: 'Automático (30 dias)', periodo: () => null },
+  { rotulo: 'Este mês', periodo: () => limitesDoMes(hojeIso()) },
+  { rotulo: 'Mês passado', periodo: () => limitesDoMes(addDias(limitesDoMes(hojeIso()).inicio, -1)) },
+]
 
 /** VMD com uma casa: "4,7/dia". Inteiro sai sem a casa, para não poluir ("5/dia"). */
 function vmdTexto(vmd: number): string {
@@ -160,8 +171,18 @@ function BlocoDaLoja({ loja, linhas }: { loja: ResumoDeLoja; linhas: LinhaEspelh
 }
 
 export default function NasLojas() {
-  const { data, isLoading, error } = useRede()
+  // null = janela automática de sempre (últimos 30 dias, ancorados no último dia com
+  // venda). Escolher um período aqui troca a consulta inteira para aquele intervalo.
+  const [periodo, setPeriodo] = useState<PeriodoDaRede | null>(null)
+  const { data, isLoading, error } = useRede(periodo ?? undefined)
   const sincronizar = useSincronizarRede()
+
+  // Datas mostradas nos campos De/Até mesmo sem filtro ativo: uma sugestão neutra (o mês
+  // atual), não aplicada até a pessoa mexer num dos dois campos.
+  const mesAtual = limitesDoMes(hojeIso())
+  const inicioExibido = periodo?.inicio ?? mesAtual.inicio
+  const fimExibido = periodo?.fim ?? mesAtual.fim
+  const duracaoDias = periodo ? diffDias(periodo.inicio, periodo.fim) + 1 : JANELA_DIAS
 
   if (isLoading) return <Carregando texto="Buscando o que saiu nas lojas…" />
   if (error) return <Erro mensagem={error.message} />
@@ -169,7 +190,7 @@ export default function NasLojas() {
 
   const pontosDeVenda = data.lojas.filter((l) => ehPontoDeVenda(l.lojaTipo))
   const centros = data.lojas.filter((l) => !ehPontoDeVenda(l.lojaTipo))
-  const rede = resumirRede(pontosDeVenda)
+  const rede = resumirRede(pontosDeVenda, duracaoDias)
   const cobRede = textoCobertura(rede.coberturaDias)
 
   const falhou = data.ultimaSincronia && data.ultimaSincronia.resultado !== 'ok'
@@ -182,7 +203,9 @@ export default function NasLojas() {
           {/* O carimbo fica visível sem abrir nada: espelho sem data vira número velho
               com cara de novo. */}
           <p className="text-sm text-stone-700">
-            {`Seus produtos nas lojas da rede`}
+            {periodo
+              ? `Período de ${dataLonga(periodo.inicio)} a ${dataLonga(periodo.fim)}`
+              : 'Seus produtos nas lojas da rede'}
             {data.diaDoDado ? ` · dado de ${dataLonga(data.diaDoDado)}` : ''}
           </p>
         </div>
@@ -194,6 +217,49 @@ export default function NasLojas() {
         >
           {sincronizar.isPending ? 'Buscando…' : 'Atualizar'}
         </button>
+      </div>
+
+      {/* Filtro de período: sem escolha nenhuma, a tela usa a janela automática de
+          sempre (30 dias ancorados no último dia com venda — ver src/lib/rede.ts). */}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {ATALHOS.map((atalho) => {
+          const p = atalho.periodo()
+          const ativo = p === null ? periodo === null : periodo?.inicio === p.inicio && periodo?.fim === p.fim
+          return (
+            <button
+              key={atalho.rotulo}
+              type="button"
+              onClick={() => setPeriodo(p)}
+              className={`min-h-[44px] rounded-full px-4 text-sm font-medium shadow ${
+                ativo ? 'bg-stone-800 text-white' : 'bg-white text-stone-700'
+              }`}
+            >
+              {atalho.rotulo}
+            </button>
+          )
+        })}
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <label className="block text-sm text-stone-600">
+          De
+          <input
+            type="date"
+            value={inicioExibido}
+            max={fimExibido}
+            onChange={(e) => setPeriodo({ inicio: e.target.value, fim: fimExibido })}
+            className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-3"
+          />
+        </label>
+        <label className="block text-sm text-stone-600">
+          Até
+          <input
+            type="date"
+            value={fimExibido}
+            min={inicioExibido}
+            onChange={(e) => setPeriodo({ inicio: inicioExibido, fim: e.target.value })}
+            className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-3"
+          />
+        </label>
       </div>
 
       {sincronizar.error && (
@@ -223,7 +289,9 @@ export default function NasLojas() {
               </span>
             </div>
             <p className="mt-1 text-xs text-stone-600">
-              Somando os {JANELA_DIAS} dias que terminam no último dia com venda.
+              {periodo
+                ? `Somando de ${dataLonga(periodo.inicio)} a ${dataLonga(periodo.fim)} (${diasTexto(duracaoDias)}).`
+                : `Somando os ${JANELA_DIAS} dias que terminam no último dia com venda.`}
             </p>
             <div className="mt-3 grid grid-cols-3 gap-2">
               <div>

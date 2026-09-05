@@ -253,22 +253,30 @@ function diaMenos(dia: string, dias: number): string {
   return d.toISOString().slice(0, 10)
 }
 
+/** Dias corridos entre duas datas ISO, incluindo as duas pontas. */
+function diasEntreInclusive(inicio: string, fim: string): number {
+  const MS_DIA = 86_400_000
+  const de = new Date(`${inicio}T00:00:00Z`).getTime()
+  const ate = new Date(`${fim}T00:00:00Z`).getTime()
+  return Math.round((ate - de) / MS_DIA) + 1
+}
+
 /**
- * Venda média diária na janela — a VMD.
+ * Venda média diária no período — a VMD.
  *
- * Divide por dias CORRIDOS da janela, não por dias com venda. É a mesma régua da
+ * Divide por dias CORRIDOS do período, não por dias com venda. É a mesma régua da
  * cobertura logo abaixo: se fossem denominadores diferentes, "VMD 5/dia" e "dá para 60
  * dias" contariam histórias que não fecham entre si na mesma linha da tela.
  */
-function vmdDaJanela(vendaNaJanela: number): number {
-  return vendaNaJanela / JANELA_DIAS
+function vmdDaJanela(vendaNoPeriodo: number, duracaoDias: number): number {
+  return vendaNoPeriodo / duracaoDias
 }
 
 /** Cobertura em dias, ou null quando não houve venda para dar ritmo. */
-function cobertura(estoque: number | null, vendaNaJanela: number): number | null {
+function cobertura(estoque: number | null, vendaNoPeriodo: number, duracaoDias: number): number | null {
   if (estoque === null) return null
-  const mediaDiaria = vendaNaJanela / JANELA_DIAS
-  // Sem venda na janela não existe ritmo, e dividir por zero daria Infinity — que a tela
+  const mediaDiaria = vendaNoPeriodo / duracaoDias
+  // Sem venda no período não existe ritmo, e dividir por zero daria Infinity — que a tela
   // mostraria como "∞ dias", lido como "sobra muito" quando o certo é "não sei".
   return mediaDiaria > 0 ? Math.round(estoque / mediaDiaria) : null
 }
@@ -305,12 +313,22 @@ function acumularFoto(alvo: Acumulador, dia: string, qtd: number) {
 /**
  * Agrupa o espelho por loja e, dentro dela, por produto.
  *
+ * Sem `periodo`, olha os últimos `JANELA_DIAS` dias ancorados no último dia com venda
+ * (comportamento de sempre). Com `periodo`, olha exatamente aquele intervalo — é o que a
+ * tela usa quando a pessoa escolhe um mês ou uma data específica para olhar. `linhas`
+ * precisa já vir filtrada para esse intervalo (é a consulta ao banco que faz esse corte);
+ * aqui só se calcula a duração certa para a VMD e a cobertura não mentirem.
+ *
  * Ordena por número da loja — loja é sempre número aqui, e ordenar por texto colocaria a
  * 10 antes da 5.
  */
-export function resumirPorLoja(linhas: LinhaEspelho[]): ResumoDeLoja[] {
-  const ancora = ancoraDaJanela(linhas)
-  const inicio = ancora ? diaMenos(ancora, JANELA_DIAS - 1) : null
+export function resumirPorLoja(
+  linhas: LinhaEspelho[],
+  periodo?: { inicio: string; fim: string },
+): ResumoDeLoja[] {
+  const ancora = periodo ? periodo.fim : ancoraDaJanela(linhas)
+  const inicio = periodo ? periodo.inicio : ancora ? diaMenos(ancora, JANELA_DIAS - 1) : null
+  const duracao = periodo ? diasEntreInclusive(periodo.inicio, periodo.fim) : JANELA_DIAS
 
   const porLoja = new Map<string, ResumoDeLoja>()
   const acLoja = new Map<string, Acumulador>()
@@ -370,10 +388,10 @@ export function resumirPorLoja(linhas: LinhaEspelho[]): ResumoDeLoja[] {
     const al = acLoja.get(codigo)!
     r.vendaQtd = al.vendaQtd
     r.vendaValor = al.vendaValor
-    r.vmd = vmdDaJanela(al.vendaQtd)
+    r.vmd = vmdDaJanela(al.vendaQtd, duracao)
     r.estoqueQtd = al.foto?.qtd ?? null
     r.diaDoEstoque = al.foto?.dia ?? null
-    r.coberturaDias = cobertura(r.estoqueQtd, r.vendaQtd)
+    r.coberturaDias = cobertura(r.estoqueQtd, r.vendaQtd, duracao)
   }
 
   for (const [chaveDoProduto, ap] of acProduto) {
@@ -385,10 +403,10 @@ export function resumirPorLoja(linhas: LinhaEspelho[]): ResumoDeLoja[] {
       produtoNome: ap.nome,
       vendaQtd: ap.vendaQtd,
       vendaValor: ap.vendaValor,
-      vmd: vmdDaJanela(ap.vendaQtd),
+      vmd: vmdDaJanela(ap.vendaQtd, duracao),
       estoqueQtd: ap.foto?.qtd ?? null,
       diaDoEstoque: ap.foto?.dia ?? null,
-      coberturaDias: cobertura(ap.foto?.qtd ?? null, ap.vendaQtd),
+      coberturaDias: cobertura(ap.foto?.qtd ?? null, ap.vendaQtd, duracao),
     })
   }
 
@@ -410,8 +428,12 @@ export function resumirPorLoja(linhas: LinhaEspelho[]): ResumoDeLoja[] {
  * Recebe já filtrado por quem soma: CD **não** entra, porque a saída dele é abastecimento
  * de loja, e somá-lo com a venda da loja contaria o mesmo café duas vezes. O CD não some
  * da tela — aparece em seção própria, com a razão escrita.
+ *
+ * `duracaoDias` precisa ser a MESMA duração usada em `resumirPorLoja` para montar
+ * `lojas` — é o que faz a VMD e a cobertura daqui baterem com a soma das lojas
+ * individuais. Default `JANELA_DIAS`, para casar com o uso sem período customizado.
  */
-export function resumirRede(lojas: ResumoDeLoja[]): ResumoDaRede {
+export function resumirRede(lojas: ResumoDeLoja[], duracaoDias: number = JANELA_DIAS): ResumoDaRede {
   let vendaQtd = 0
   let vendaValor = 0
   let estoqueQtd: number | null = null
@@ -427,9 +449,9 @@ export function resumirRede(lojas: ResumoDeLoja[]): ResumoDaRede {
   return {
     vendaQtd,
     vendaValor,
-    vmd: vmdDaJanela(vendaQtd),
+    vmd: vmdDaJanela(vendaQtd, duracaoDias),
     estoqueQtd,
-    coberturaDias: cobertura(estoqueQtd, vendaQtd),
+    coberturaDias: cobertura(estoqueQtd, vendaQtd, duracaoDias),
     lojas: lojas.length,
     apertadas,
   }
